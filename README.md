@@ -14,3 +14,10 @@ Contact: All other instances
 Element deletion: Simply judge by plastic strain  
 Time step: Fixed  
 Mass scaling: Fixed (user input)  
+  
+## Install  
+No need to install  
+Just DL source folders to your PC  
+  
+##
+
