@@ -10,6 +10,7 @@ There are Matlab(.m) and Julia(.jl) versions
 ## Overview  
 Input: .inp file. You can use Abaqus Learning Edition for Pre  
 Output: .vtk file. You can use ParaView for Post  
+Windows only  
   
 ## Specifications of HAKAI  
 Analysis type: Dynamic explicit only  
@@ -26,12 +27,12 @@ Just DL "HAKAI-vx.x.x" folders to your PC
 ## Execution  
 ### Matlab  
 Example:  
-Matlab command window
+Matlab command window  
 res = HAKAI('input\\Tensile5e.inp')  
   
 ### Julia  
 Example:  
-Command prompt
+Command prompt  
 julia HAKAI_j.jl input\Tensile5e.inp
 
 
