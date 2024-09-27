@@ -1,4 +1,8 @@
 # HAKAI-fem
+
+![cae_20240828_001_ss](https://github.com/user-attachments/assets/bb749479-2e07-4cfb-8251-5dac315f9dfa)
+
+
 ## HAKAI is ...  
 Simple finite element method dynamic explicit solver  
 There are Matlab(.m) and Julia(.jl) versions  
