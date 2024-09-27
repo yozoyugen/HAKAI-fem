@@ -21,7 +21,7 @@ Mass scaling: Fixed (user input)
   
 ## Install  
 No need to install  
-Just DL source folders to your PC  
+Just DL "HAKAI-vx.x.x" folders to your PC  
   
 ##
 
