@@ -24,14 +24,12 @@ Mass scaling: Fixed (user input)
 No need to install  
 Just DL "HAKAI-vx.x.x" folders to your PC  
   
-## Execution  
+## Execution example  
 ### Matlab  
-Example:  
 Matlab command window  
 res = HAKAI('input\\Tensile5e.inp')  
   
 ### Julia  
-Example:  
 Command prompt  
 julia HAKAI_j.jl input\Tensile5e.inp
 
