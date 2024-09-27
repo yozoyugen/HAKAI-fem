@@ -23,7 +23,7 @@ Mass scaling: Fixed (user input)
 No need to install  
 Just DL "HAKAI-vx.x.x" folders to your PC  
   
-## Excution  
+## Execution  
 ### Matlab
 ### Julia
 
