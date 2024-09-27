@@ -11,6 +11,6 @@ Output: .vtk file. You can use ParaView for Post
 Analysis type: Dynamic explicit only  
 Element type: Solid hex only  
 Contact: All other instances  
-Element deletion: Simply judge by plastic strain
+Element deletion: Simply judge by plastic strain  
 Time step: Fixed  
-Mass scaling: User input  
+Mass scaling: Fixed (user input)  
