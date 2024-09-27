@@ -19,9 +19,11 @@ Element deletion: Simply judge by plastic strain
 Time step: Fixed  
 Mass scaling: Fixed (user input)  
   
-## Install  
+## Installation  
 No need to install  
 Just DL "HAKAI-vx.x.x" folders to your PC  
   
-##
+## Excution  
+### Matlab
+### Julia
 
