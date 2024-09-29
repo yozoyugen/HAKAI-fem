@@ -35,6 +35,8 @@ julia HAKAI_j.jl input\Tensile5e.inp
   
 ## Demo video
 Tensile5e.inp, Tensile5e-glmsh.inp  
-https://youtu.be/7pOkPujlj1I
+[![''](https://github.com/user-attachments/assets/0954b6b4-574d-4911-a83a-97b43eabf731)](https://youtu.be/7pOkPujlj1I)
+
+
 
 
