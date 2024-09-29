@@ -47,7 +47,7 @@
 *Elset, elset=Set-3, generate
  1,  5,  1
 ** Section: Section-1
-*Solid Section, elset=Set-1, material=steel_Elastoplast
+*Solid Section, elset=Set-1, material=steel_Ductile
 ,
 *End Part
 **  
@@ -112,7 +112,7 @@
 1100.,   4.
 *Damage Initiation, criterion=DUCTILE
  1.0, 0., 30.
- 0.4, 0.3, 30.
+ 0.3, 0.3, 30.
 ** 
 ** BOUNDARY CONDITIONS
 ** 
