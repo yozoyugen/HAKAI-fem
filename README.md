@@ -31,6 +31,10 @@ res = HAKAI('input\\Tensile5e.inp')
   
 ### Julia  
 Command prompt  
-julia HAKAI_j.jl input\Tensile5e.inp
+julia HAKAI_j.jl input\Tensile5e.inp  
+  
+## Demo video
+Tensile5e.inp, Tensile5e-glmsh.inp  
+https://youtu.be/7pOkPujlj1I
 
 
