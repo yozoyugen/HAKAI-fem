@@ -28,11 +28,11 @@ Just DL "HAKAI-vx.x.x" folders to your PC
 ## Execution example  
 ### Matlab  
 Matlab command window  
-res = HAKAI('input\\Tensile5e.inp')  
+res = HAKAI('..\\input\\Tensile5e.inp')  
   
 ### Julia  
 Command prompt  
-julia HAKAI_j.jl input\Tensile5e.inp  
+julia HAKAI_j.jl ..\input\Tensile5e.inp  
   
 ## Demo video
 Tensile5e.inp, Tensile5e-glmsh.inp  
