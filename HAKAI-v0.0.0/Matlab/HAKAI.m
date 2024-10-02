@@ -1163,6 +1163,10 @@ function write_vtk(index_, coordmat, elementmat, element_flag, disp, data)
         end
     end
 
+    if not(exist('temp','dir'))
+        mkdir('temp')
+    end
+
     fname = sprintf("temp\\file%03d.vtk", index_);
     out = fopen(fname,"w");
     fprintf(out,"# vtk DataFile Version 2.0\n");
