@@ -22,6 +22,8 @@ Mass scaling: Fixed (user input)
 ## Installation  
 No need to install  
 Just DL "HAKAI-vx.x.x" folders to your PC  
+### Demo video  
+[![''](https://github.com/user-attachments/assets/35cd1b3b-4d7a-473d-9537-e63199070e8a)](https://youtu.be/XKaCQ7hLbfo)  
   
 ## Execution example  
 ### Matlab  
