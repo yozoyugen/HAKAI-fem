@@ -43,9 +43,10 @@ bullet-impact.inp, bullet-impact-glmsh.inp,
   
 Tensile-test.inp, Tensile-test-glmsh.inp (Dog-bone)  
 [![''](https://github.com/user-attachments/assets/430d8c8f-69ab-41f7-9ad8-02c56e010f8b)](https://youtu.be/zrBSUzXMs58)  
-
   
-
-
-
-
+Charpy-test.inp, Charpy-test-glmsh.inp  
+[![''](https://github.com/user-attachments/assets/34fed318-ca60-479c-9620-71e320c64c21)](https://youtu.be/05grq5s9JtM)  
+  
+metal-cutting.inp, metal-cutting-glmsh.inp  
+[![''](https://github.com/user-attachments/assets/074c40b4-2ee5-4738-9152-57285dd7324f)](https://youtu.be/V5tDbxtWsfY)  
+  
