@@ -14,10 +14,11 @@ Windows only
 ## Specifications of HAKAI  
 Analysis type: Dynamic explicit only  
 Element type: Solid hex only  
-Contact: All other instances  
+Contact: All other instances(No friction)  
 Element deletion: Simply judge by plastic strain  
 Time step: Fixed  
 Mass scaling: Fixed (user input)  
+No damping  
   
 ## Installation  
 No need to install  
