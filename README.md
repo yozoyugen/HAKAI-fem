@@ -4,6 +4,7 @@
 
 ## HAKAI is ...  
 Simple finite element method dynamic explicit solver  
+for elastoplastic and fracture analysis.  
 There are Matlab(.m) and Julia(.jl) versions  
 
 ## Overview  
