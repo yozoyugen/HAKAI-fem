@@ -36,7 +36,10 @@ res = HAKAI('..\\input\\Tensile5e.inp')
 Command prompt  
 julia HAKAI_j.jl ..\input\Tensile5e.inp  
   
-## Example analysis
+## Example analysis  
+metal-cutting.inp, metal-cutting-glmsh.inp  
+[![''](https://github.com/user-attachments/assets/074c40b4-2ee5-4738-9152-57285dd7324f)](https://youtu.be/V5tDbxtWsfY)  
+  
 Tensile5e.inp, Tensile5e-glmsh.inp  
 [![''](https://github.com/user-attachments/assets/0954b6b4-574d-4911-a83a-97b43eabf731)](https://youtu.be/7pOkPujlj1I)
   
@@ -48,7 +51,4 @@ Tensile-test.inp, Tensile-test-glmsh.inp (Dog-bone)
   
 Charpy-test.inp, Charpy-test-glmsh.inp  
 [![''](https://github.com/user-attachments/assets/34fed318-ca60-479c-9620-71e320c64c21)](https://youtu.be/05grq5s9JtM)  
-  
-metal-cutting.inp, metal-cutting-glmsh.inp  
-[![''](https://github.com/user-attachments/assets/074c40b4-2ee5-4738-9152-57285dd7324f)](https://youtu.be/V5tDbxtWsfY)  
   
