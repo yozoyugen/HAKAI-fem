@@ -743,14 +743,16 @@ function hakai(fname)
                     
                 if i_instance == i  #i_instance
                     #CT[c].c_nodes_i = c_nodes .+ MODEL.INSTANCE[i].node_offset  
-                    append!(CT[c].c_nodes_i, add_c_nodes .+ MODEL.INSTANCE[i].node_offset )
+                    append!(CT[c].c_nodes_i, add_c_nodes .+ MODEL.INSTANCE[instance_id].node_offset )
+                    unique!(CT[c].c_nodes_i)
                     
                 elseif j_instance == i  
                     #CT[c].c_nodes_j = c_nodes .+ MODEL.INSTANCE[i].node_offset
                     #CT[c].c_triangles = c_triangles .+ MODEL.INSTANCE[i].node_offset
                     #CT[c].c_triangles_eleid = c_triangles_eleid .+ MODEL.INSTANCE[i].element_offset
 
-                    append!(CT[c].c_nodes_j, add_c_nodes .+ MODEL.INSTANCE[i].node_offset )
+                    append!(CT[c].c_nodes_j, add_c_nodes .+ MODEL.INSTANCE[instance_id].node_offset )
+                    unique!(CT[c].c_nodes_j)
                     append!(CT[c].c_triangles_eleid, add_c_triangles_eleid .+ MODEL.INSTANCE[i].element_offset )
                     CT[c].c_triangles = vcat(CT[c].c_triangles, add_c_triangles .+ MODEL.INSTANCE[i].node_offset)
                 end
