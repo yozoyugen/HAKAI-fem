@@ -830,11 +830,11 @@ function readInpFile( fname )
     mass_scaling = 1.;
     for i = 1 : n
       if occursin.("*Fixed Mass Scaling", lines[i])  #contains(lines{i}, '*Fixed Mass Scaling') > 0  
-          s = replace(lines[i+1], " " => "")
+          s = replace(lines[i], " " => "")
           ss = split(s, ",", keepempty=false) 
           ss = ss[2];
           v_ = ss[ findfirst("factor=", ss).stop + 1 : length(ss) ];
-          mass_scaling = parse(Float64, v) #str2double(v_);
+          mass_scaling = parse(Float64, v_) #str2double(v_);
           break
       end
     end
@@ -1051,6 +1051,14 @@ function readInpFile( fname )
           break
       end
     end
+
+    for i = 1 : n
+        if occursin.("*Contact Inclusions", lines[i]) && occursin.("HAKAIoption=self-contact", lines[i])
+            contact_flag = 2;
+            break
+        end
+      end
+  
 
     cp_index = [];
     for i = 1 : n

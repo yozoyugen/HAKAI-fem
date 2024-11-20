@@ -22,6 +22,8 @@ using LinearAlgebra
 using StaticArrays
 using Printf
 using Plots
+using Base.Threads
+using FLoops
 
 include("./readInpFile_j.jl")
 
@@ -75,6 +77,8 @@ end
 
 function hakai(fname)
 
+    println("nthreads:", Threads.nthreads())
+
     rname = @sprintf("julia_bug_report.txt")
     bug_report = open(rname,"w")
 
@@ -88,20 +92,24 @@ function hakai(fname)
     println("nNode:", nNode)
     coordmat = MODEL.coordmat # column major
     nElement = MODEL.nElement;
+    println("nElement:", nElement)
     elementmat = MODEL.elementmat # column major
     element_material = MODEL.element_material;
     element_instance = MODEL.element_instance;
     contact_flag = MODEL.contact_flag;
+    println("contact_flag:", contact_flag)
     
     flag_fracture = 0;
     
     mass_scaling = MODEL.mass_scaling;
+    println("mass_scaling:", mass_scaling)
     d_time = MODEL.d_time * sqrt(mass_scaling);
     end_time = MODEL.end_time;
     time_num = end_time / d_time;
     println("time_num:", time_num)
-    C = 0.0;
 
+    div_d_time = 1.0 / d_time
+    div_d_time2 = 1.0 / d_time^2
 
     force_dof = Int[];
     force_v = Float64[];
@@ -195,6 +203,8 @@ function hakai(fname)
     end
 
     diag_M .= diag_M * mass_scaling;
+
+    C = 0.0;
     diag_C .= diag_M * C;
 
     #for i = 1 : fn
@@ -217,6 +227,8 @@ function hakai(fname)
             velo[ MODEL.IC[i].dof[j] ] .= MODEL.IC[i].value[j]
         end
     end
+    #println("disp_pre:", disp_pre)
+    #println("velo:", velo)
 
     #%--- Contact ---%
     instance_pair = Vector{Vector{Int}}()
@@ -226,7 +238,7 @@ function hakai(fname)
                       zeros(3), zeros(3), zeros(3), zeros(3), zeros(3) )
     all_exterior_flag = 0  # ->  0: CP based local contact,   1: all surface contact
 
-    if contact_flag == 1
+    if contact_flag >= 1
         
         for i = 1 : length(MODEL.INSTANCE)  
     
@@ -258,6 +270,9 @@ function hakai(fname)
                 for i = 1 : ni
                     js = i+1;
                     #js = i;  #% -> include self-contact
+                    if contact_flag == 2
+                        js = i;
+                    end
                     
                     for j = js : ni  
                         #% c_pair = [c_pair; i j];
@@ -406,12 +421,14 @@ function hakai(fname)
     external_force = zeros(fn);
     c_force3 = zeros(fn);
     Q = zeros(fn);
-    #Barray = zeros(6,24,integ_num) # -> even
-    Barray = [ @MMatrix zeros(6,24) for i=1:8]
-    BVarray = [ @MMatrix zeros(6,24) for i=1:8]
-    detJarray = @MVector zeros(integ_num)
-    Dmat = @MMatrix zeros(6,6)
-    e_position = @MMatrix zeros(3,8)
+    Qe = zeros(24, nElement);
+    #Q = [Threads.Atomic{Float64}(0) for _ in 1:fn]
+            #Barray = zeros(6,24,integ_num) # -> even
+        #Barray = [ @MMatrix zeros(6,24) for i=1:8]
+        #BVarray = [ @MMatrix zeros(6,24) for i=1:8]
+        #detJarray = @MVector zeros(integ_num)
+        #Dmat = @MMatrix zeros(6,6)
+        #e_position = @MMatrix zeros(3,8)
 
     #integ_stress = zeros( nElement * integ_num, 6);  # row major
     integ_stress = zeros( 6, nElement * integ_num); # column major
@@ -437,7 +454,7 @@ function hakai(fname)
     element_ctr = zeros(nElement,3);
     #element_ctr = cal_element_ctr(coordmat, elementmat);
 
-    output_num = 40
+    output_num = 100
     d_out = Int(floor(time_num / output_num))
 
     output_disp = Array{Float64,2}(undef, fn, output_num)
@@ -466,7 +483,7 @@ function hakai(fname)
         external_force .= 0.0      # -> 0 alloc
         external_force[ force_dof ] = force_v;
 
-        if contact_flag == 1
+        if contact_flag >= 1
                     #c_force3 = cal_contact_force(c_pair, position, velo, diag_M, elementMinSize, 
                     #                             MODEL.INSTANCE, MODEL.PART, MODEL.MATERIAL, element_flag);
                     #c_force3, d_node = cal_contact_force(MODEL.CP, position, velo, diag_M, elementMinSize, elementMaxSize, d_max, copy(d_node),  
@@ -508,10 +525,12 @@ function hakai(fname)
             #println(disp_new)
 
         #println("disp_new_i:")
+        # @floop 
         @inbounds for  i = 1 : fn    # much faster than [ =  dot operations ],     Almost equal to .=
+                #disp_new[i] = 1.0 / (diag_M[i]*div_d_time2 + diag_C[i]/2.0*div_d_time) * ( external_force[i] - Q[i] + diag_M[i]*div_d_time2 * (2.0*disp[i] - disp_pre[i]) + diag_C[i]/2.0*div_d_time * disp_pre[i] );
             disp_new[i] = 1.0 / (diag_M[i]/d_time^2 + diag_C[i]/2.0/d_time) * ( external_force[i] - Q[i] + diag_M[i]/d_time^2.0 * (2.0*disp[i] - disp_pre[i]) + diag_C[i]/2.0/d_time * disp_pre[i] );
-            #print(v,", ")
-            #disp_new[i] = v
+                #print(v,", ")
+                #disp_new[i] = v
         end  # -> 0 alloc
         #println("")
         #println(disp_new)
@@ -623,12 +642,25 @@ function hakai(fname)
             #                MODEL.MATERIAL, element_material, elementMinSize); # ->OK
 
             #Barray .= 0.0
-        cal_stress_hexa(Barray, BVarray, detJarray, Dmat, e_position, 
+#=        cal_stress_hexa(#Barray, BVarray, #detJarray, #e_position,  #Dmat, 
                         Q, integ_stress, integ_strain, integ_yield_stress, integ_eq_plastic_strain, 
                         position, d_disp, elementmat, element_flag, integ_num, Pusai_mat,  
                         MODEL.MATERIAL, element_material, elementMinSize); # ->OK
-        # -> 4 alloc
-
+        # -> 3 alloc  # 8
+=#
+        Qe .= 0.0
+        cal_stress_hexa(#Barray, BVarray, #detJarray, #e_position,  #Dmat, 
+                        Qe, integ_stress, integ_strain, integ_yield_stress, integ_eq_plastic_strain, 
+                        position, d_disp, elementmat, element_flag, integ_num, Pusai_mat,  
+                        MODEL.MATERIAL, element_material, elementMinSize); # ->OK
+        Q .= 0.0                        
+        @inbounds for e = 1 : nElement
+            @inbounds for i = 1 : 8
+                Q[ 1 + (elementmat[i,e]-1)*3 ] += Qe[1 + (i-1)*3, e];
+                Q[ 2 + (elementmat[i,e]-1)*3 ] += Qe[2 + (i-1)*3, e];
+                Q[ 3 + (elementmat[i,e]-1)*3 ] += Qe[3 + (i-1)*3, e];
+            end
+        end
   
             #integ_stress .+= d_integ_stress;   # . -> bit reduce allocs. and memory
             #integ_strain .+= d_integ_strain;
@@ -741,20 +773,20 @@ function hakai(fname)
                 j_instance = instance_pair[c][2]
                 #println("i_instance:", i_instance, " j_instance:", j_instance)
                     
-                if i_instance == i  #i_instance
+                if i_instance == instance_id  #i_instance
                     #CT[c].c_nodes_i = c_nodes .+ MODEL.INSTANCE[i].node_offset  
                     append!(CT[c].c_nodes_i, add_c_nodes .+ MODEL.INSTANCE[instance_id].node_offset )
                     unique!(CT[c].c_nodes_i)
                     
-                elseif j_instance == i  
+                elseif j_instance == instance_id  
                     #CT[c].c_nodes_j = c_nodes .+ MODEL.INSTANCE[i].node_offset
                     #CT[c].c_triangles = c_triangles .+ MODEL.INSTANCE[i].node_offset
                     #CT[c].c_triangles_eleid = c_triangles_eleid .+ MODEL.INSTANCE[i].element_offset
 
                     append!(CT[c].c_nodes_j, add_c_nodes .+ MODEL.INSTANCE[instance_id].node_offset )
                     unique!(CT[c].c_nodes_j)
-                    append!(CT[c].c_triangles_eleid, add_c_triangles_eleid .+ MODEL.INSTANCE[i].element_offset )
-                    CT[c].c_triangles = vcat(CT[c].c_triangles, add_c_triangles .+ MODEL.INSTANCE[i].node_offset)
+                    append!(CT[c].c_triangles_eleid, add_c_triangles_eleid .+ MODEL.INSTANCE[instance_id].element_offset )
+                    CT[c].c_triangles = vcat(CT[c].c_triangles, add_c_triangles .+ MODEL.INSTANCE[instance_id].node_offset)
                 end
      
                 #println("CT[", c, "]:", CT[c])  # -> Match with Matlab
@@ -989,8 +1021,8 @@ end
 #function cal_stress_hexa(Q, integ_stress_pre_, integ_strain_, integ_yield_stress_, integ_eq_plastic_strain_, 
 #                         position_, d_disp_, elementmat, element_flag, integ_num, Pusai_mat,  
 #                         MATERIAL, element_material, elementMinSize)
-function cal_stress_hexa(Barray, BVarray, detJarray, Dmat, e_position,   #-> huge reduce alloc and memory
-                         Q, integ_stress_pre_, integ_strain_, integ_yield_stress_, integ_eq_plastic_strain_, 
+function cal_stress_hexa(#Barray, BVarray, #detJarray, #e_position,  #Dmat,   #-> huge reduce alloc and memory
+                         Qe, integ_stress_pre_, integ_strain_, integ_yield_stress_, integ_eq_plastic_strain_, 
                          position_, d_disp_, elementmat, element_flag, integ_num, Pusai_mat,  
                          MATERIAL, element_material, elementMinSize)
 
@@ -1003,7 +1035,7 @@ function cal_stress_hexa(Barray, BVarray, detJarray, Dmat, e_position,   #-> hug
 
     fn = size(position_,1)*3;
             #Q = zeros(fn)
-    Q .= 0.0;
+    #Q .= 0.0;
 
             # weight = 1
             # W = [2.0]; # integ_num = 1
@@ -1013,95 +1045,99 @@ function cal_stress_hexa(Barray, BVarray, detJarray, Dmat, e_position,   #-> hug
     W = 1.0
     #div3::Float64 = 1.0/3.0
 
-    #Barray = zeros(6,24,integ_num);  #@MArray -> huge increase alloc and memory
-    #BVarray = zeros(6,24,integ_num);
+        #Barray = zeros(6,24,integ_num);  #@MArray -> huge increase alloc and memory
+        #BVarray = zeros(6,24,integ_num);
     
     #Barray = [ @MMatrix zeros(6,24) for i=1:8] # -> huge reduce alloc and memory compared to zeros(6,24,integ_num)
     #BVarray = [ @MMatrix zeros(6,24) for i=1:8]
-    for i = 1 : 8
-        Barray[i] .= 0.0
-        BVarray[i] .= 0.0
-    end
+    #for i = 1 : 8
+    #    Barray[i] .= 0.0
+    #    BVarray[i] .= 0.0
+    #end
 
-    d_u = @MVector zeros(24); # Memory reduce
-    B = @MMatrix zeros(6,24);
-    #P2 = @MMatrix zeros(3,8);
+        #d_u = @MVector zeros(24); # Memory reduce
+        #B = @MMatrix zeros(6,24);
+        #P2 = @MMatrix zeros(3,8);
             #Jarray = zeros(3,3,integ_num);
     
-    BVbar = @MMatrix zeros(6,24); # @MMatrix -> reduce alloc and memory
-    BVbar_i = @MMatrix zeros(6,24);
-    BV_i = @MMatrix zeros(6,24);
-    Bfinal = @MMatrix zeros(6,24); # @MMatrix -> huge reduce alloc and memory
-    q_vec = @MVector zeros(24); # Memory reduce
-    q_vec_i = @MVector zeros(24)
-    tri_dev_stress = @MVector zeros(6); #@MVector -> huge reduce alloc and memory
-    pre_stress = @MVector zeros(6); #@MVector -> bit reduce alloc and memory
-    tri_stress = @MVector zeros(6); #@MVector -> reduce alloc and memory
-    mean_stress_vec = @MVector zeros(6); #@MVector -> huge reduce alloc and memory
-    final_dev_stress = @MVector zeros(6);
-    final_stress = @MVector zeros(6); #@MVector -> bit reduce alloc and memory
-    d_o_vec = @MVector zeros(6); #@MVector -> bit reduce alloc and memory
-    d_e_vec = @MVector zeros(6); #@MVector -> even
+        #BVbar = @MMatrix zeros(6,24); # @MMatrix -> reduce alloc and memory
+        #BVbar_i = @MMatrix zeros(6,24);
+        #BV_i = @MMatrix zeros(6,24);
+        #Bfinal = @MMatrix zeros(6,24); # @MMatrix -> huge reduce alloc and memory
+        #q_vec = @MVector zeros(24); # Memory reduce
+        #q_vec_i = @MVector zeros(24)
+        #tri_dev_stress = @MVector zeros(6); #@MVector -> huge reduce alloc and memory
+        #pre_stress = @MVector zeros(6); #@MVector -> bit reduce alloc and memory
+        #tri_stress = @MVector zeros(6); #@MVector -> reduce alloc and memory
+        #mean_stress_vec = @MVector zeros(6); #@MVector -> huge reduce alloc and memory
+        #final_dev_stress = @MVector zeros(6);
+        #final_stress = @MVector zeros(6); #@MVector -> bit reduce alloc and memory
+        #d_o_vec = @MVector zeros(6); #@MVector -> bit reduce alloc and memory
+        #d_e_vec = @MVector zeros(6); #@MVector -> even
             #o_vec = zeros(6); #@MVector -> huge increase alloc and memory
             #e_position = zeros(8,3); # @MMatrix -> huge increase alloc and memory, causes compilation time
 
 
             #d_e_vec = @MVector zeros(Float64, 6) # -> no meaning
             #J = zeros(3,3)
-    
+
+            # cause small alloc
+                #detJarray = zeros(integ_num);  #@MVector -> huge increase alloc and memory
+                #e_position = zeros(3,8)  # -> 1 alloc
+                #Dmat = @MMatrix zeros(6,6)  #@MMatrix -> huge reduce alloc and memory,  # -> 1 alloc
+                #Dmat .= MATERIAL[mat_id].Dmat;
+
+    #=
     mat_id = element_material[1]
     G = MATERIAL[mat_id].G;
     Hd = MATERIAL[mat_id].Hd
     plastic_property_ = MATERIAL[mat_id].plastic;
     npp = size(plastic_property_,1)
-    
-        # cause small alloc
-            #detJarray = zeros(integ_num);  #@MVector -> huge increase alloc and memory
-            #e_position = zeros(3,8)  # -> 1 alloc
-            #Dmat = @MMatrix zeros(6,6)  #@MMatrix -> huge reduce alloc and memory,  # -> 1 alloc
-            #Dmat .= MATERIAL[mat_id].Dmat;
-        @inbounds for i = 1 : 36  # -> 0 alloc
-            Dmat[i] = MATERIAL[mat_id].Dmat[i]
-        end
 
-    
-          #mean_stress::Float64 = 0.0 # no effect
+    @inbounds for i = 1 : 36  # -> 0 alloc
+        Dmat[i] = MATERIAL[mat_id].Dmat[i]
+    end
+    =#
 
-    @inbounds for e = 1 : nElement  #
+    #q_mat = @MMatrix zeros(24, nElement)
+    
+    #  
+    @inbounds @floop for e = 1 : nElement  #
 
         if element_flag[e] == 0
             continue;
         end
 
-                #mat_id = element_material[e];
-                #Dmat .= MATERIAL[mat_id].Dmat;
-                #G = MATERIAL[mat_id].G;
-                #plastic_property_ = MATERIAL[mat_id].plastic;
-
-        if mat_id != element_material[e]
-            mat_id = element_material[e]
-            #Dmat .= MATERIAL[mat_id].Dmat;
-            @inbounds for i = 1 : 36  # -> 0 alloc
-                Dmat[i] = MATERIAL[mat_id].Dmat[i]
-            end
-            G = MATERIAL[mat_id].G;
-            plastic_property_ = MATERIAL[mat_id].plastic;
-            Hd = MATERIAL[mat_id].Hd
-            npp = size(plastic_property_,1)
+        mat_id = element_material[e];
+            #Dmat = MATERIAL[mat_id].Dmat;
+        G = MATERIAL[mat_id].G;
+        plastic_property_ = MATERIAL[mat_id].plastic;
+        Hd = MATERIAL[mat_id].Hd
+        npp = size(plastic_property_,1)
+        Dmat =  @MMatrix zeros(6,6)
+        @inbounds for i = 1 : 36  # -> 0 alloc
+            Dmat[i] = MATERIAL[mat_id].Dmat[i]
         end
+
+    #=      if mat_id != element_material[e]
+                mat_id = element_material[e]
+                    #Dmat .= MATERIAL[mat_id].Dmat;
+                @inbounds for i = 1 : 36  # -> 0 alloc
+                    Dmat[i] = MATERIAL[mat_id].Dmat[i]
+                end
+                G = MATERIAL[mat_id].G;
+                plastic_property_ = MATERIAL[mat_id].plastic;
+                Hd = MATERIAL[mat_id].Hd
+                npp = size(plastic_property_,1)
+            end=#
 
                 #e_position = position_[ elementmat[e,:], :];
                 #println("e_position:", e_position)
 
-        #d_u = zeros(24,1);
+            #d_u = zeros(24,1);
+        d_u = @MVector zeros(24)
+        e_position = @MMatrix  zeros(3,8)  #
         @inbounds for i = 1 : 8   # 0 alloc
-            #d_u[1+(i-1)*3] = d_disp_[ 1+(elementmat[e,i]-1)*3 ];
-            #d_u[2+(i-1)*3] = d_disp_[ 2+(elementmat[e,i]-1)*3 ];
-            #d_u[3+(i-1)*3] = d_disp_[ 3+(elementmat[e,i]-1)*3 ];
-            #e_position[i,1] = position_[ elementmat[e,i], 1];  # -> reduce of alloc and memory, comparing "e_position = position_[ elementmat[e,:], :]"
-            #e_position[i,2] = position_[ elementmat[e,i], 2];
-            #e_position[i,3] = position_[ elementmat[e,i], 3];
-
             d_u[1+(i-1)*3] = d_disp_[ 1+(elementmat[i,e]-1)*3 ];  # -> 0 alloc
             d_u[2+(i-1)*3] = d_disp_[ 2+(elementmat[i,e]-1)*3 ];
             d_u[3+(i-1)*3] = d_disp_[ 3+(elementmat[i,e]-1)*3 ];
@@ -1111,89 +1147,58 @@ function cal_stress_hexa(Barray, BVarray, detJarray, Dmat, e_position,   #-> hug
             e_position[3,i] = position_[ 3, elementmat[i,e]];
         end
 
-
-
                 #if norm(d_u) < elementMinSize * 1.0E-7
                 #    continue
                 #end
 
-                #q_vec = zeros(24);
-                #q_vec .= 0.0;  # -> 1 alloc
-        @inbounds for i = 1 : 24
-            q_vec[i] = 0.0
-        end
+        q_vec = @MVector zeros(24)
+            #BVbar .= 0.0
+        BVbar = @MMatrix zeros(6,24)
+            #V = 0.0;
 
-                #Barray = zeros(6,24,integ_num);
-                #Jarray = zeros(3,3,integ_num);
-                #detJarray = zeros(integ_num);
-        BVbar .= 0.0
-        V = 0.0;
+        cal_BVbar_hexa( Pusai_mat, e_position, BVbar)   
 
-#=      @inbounds for i = 1 : integ_num  # -> 2.5M/20k alloc -> 4 alloc
-                    #B, J = cal_B_hexa(Pusai_mat[:,:,i], e_position);
-                    #B, J, P2 = cal_B_hexa( Pusai_mat[:,:,i], e_position);
-                    #B, P2, detJi = cal_B_hexa( Pusai_mat[:,:,i], e_position);
-                    #detJi = cal_B_hexa( Pusai_mat[:,:,i], e_position, B, P2) # -> this can reduce huge alloc of B, P2
-            detJi = cal_B_hexa( Pusai_mat[i], e_position, B, P2)   #-> 2.5M/20k alloc -> 2 alloc
-            #cal_B_hexa( Pusai_mat[i], e_position, B, P2, detJarray, i) #->no effect
-                    #Barray[:,:,i] .= B;    # .= -> same alloc and memory, but much faster
-            Barray[i] .= B
-                    #Jarray[:,:,i] = J;
-                    #detJi = det(J);
-                    #detJi = my3det(J);
-            detJarray[i] = detJi;
-                    #%V = V + det(J);
-            V = V + detJi;
-            #V = V + detJarray[i];
-
-            cal_BVbar( P2, detJi, BV_i, BVbar_i) # -> this can reduce huge alloc of BV_i, BVbar_i
-                #cal_BVbar( P2, detJarray[i], BV_i, BVbar_i) # -> no effect
-            # -> 2 alloc
-                    #BV_i, BVbar_i = cal_BVbar( P2, detJi ); # .= -> cannnot
-                    #BVarray[:,:,i] .= BV_i; # .= -> same alloc and memory, but much faster
-            BVarray[i] .= BV_i
-            BVbar .= BVbar .+ BVbar_i;  # .= .+  -> huge reduce of alloc and memory
-        end =#
-
+#=        Parray = [ @MMatrix zeros(3,8) for i=1:8]
+        detJarray = @MVector zeros(8)
         @inbounds for i = 1 : integ_num
 
-            detJi = cal_B_BVbar_hexa( Pusai_mat[i], e_position, B, BV_i, BVbar_i)   
+                    #detJi = cal_B_BVbar_hexa( Pusai_mat[i], e_position, B, BV_i, BVbar_i)   
+                    #Barray[i] .= B
+                    #BVarray[i] .= BV_i
+                    
+                    #detJi = cal_B_BVbar_hexa( Pusai_mat[i], e_position, Barray[i], BVarray[i], BVbar_i)   
+                    #BVbar .= BVbar .+ BVbar_i
+                #detJi = cal_B_BVbar_hexa( Pusai_mat[i], e_position, Barray[i], BVarray[i], BVbar)   
+                #V = V + detJi
+            #detJi = cal_B_BVbar_hexa( Pusai_mat[i], e_position, Barray[i], BVarray[i], Parray[i])   
+            detJi = cal_P_hexa( Pusai_mat[i], e_position, Parray[i])   
             detJarray[i] = detJi
-            Barray[i] .= B
-            BVarray[i] .= BV_i
-            BVbar .= BVbar .+ BVbar_i
-            V = V + detJi
+            
+        end =#
+        #BVbar .= BVbar / V;
 
-        end
-
-        BVbar .= BVbar / V;
-
-        #=      #BVarray = zeros(6,24,integ_num);
-                #BVbar = zeros(6,24);
-                BVbar .= 0.
-                for i = 1 : integ_num
-                    BV_i, BVbar_i = cal_BVbar(Pusai_mat[:,:,i], Jarray[:,:,i], detJarray[i] );
-                    BVarray[:,:,i] = BV_i;
-                    BVbar = BVbar + BVbar_i;
-                end
-                BVbar = BVbar / V; =#
+        
+        Bfinal = @MMatrix zeros(6,24)
 
         @inbounds for i = 1 : integ_num
 
-          # B(6,24)
-          #B, J = cal_B_hexa(Pusai_mat[:,:,i], e_position);
-          #B = Barray[:,:,i] .+ BVbar .- BVarray[:,:,i];
-          #Bfinal .= Barray[:,:,i] .+ BVbar .- BVarray[:,:,i];  # .= .+ -> huge reduce for alloc and memory. Fast
-          Bfinal .= Barray[i] .+ BVbar .- BVarray[i];
+                #Bfinal .= Barray[i] .+ BVbar .- BVarray[i];
+            #Bfinal = Barray[i] .+ BVbar .- BVarray[i];
+          #Bfinal = @MMatrix zeros(6,24)
+          Bfinal .= 0
+          #cal_Bfinal(Bfinal, Parray[i], BVbar)
+          detJ = cal_Bfinal(Bfinal, BVbar, Pusai_mat[i], e_position)
 
-          #d_e_vec = B * d_u;
-          d_e_vec .= Bfinal * d_u;  # .=  -> huge reduce for alloc and memory
-          d_o_vec .= Dmat * d_e_vec;
+            #d_e_vec .= Bfinal * d_u;  # .=  -> huge reduce for alloc and memory
+            #d_o_vec .= Dmat * d_e_vec;
+          d_e_vec = Bfinal * d_u
+          d_o_vec = Dmat * d_e_vec;
 
           index_i = (e-1)*integ_num+i;
-          #pre_stress = integ_stress_pre_[:,index_i];
-          #pre_stress = copy(integ_stress_[:,index_i]);
-          #pre_stress = integ_stress_pre_[index_i,:];
+            #pre_stress = integ_stress_pre_[:,index_i];
+            #pre_stress = copy(integ_stress_[:,index_i]);
+            #pre_stress = integ_stress_pre_[index_i,:];
+          pre_stress = @MVector zeros(6)
           pre_stress[1] = integ_stress_pre_[1,index_i];  # -> reduce of alloc and memory, comparing "pre_stress = integ_stress_pre_[:,index_i]"
           pre_stress[2] = integ_stress_pre_[2,index_i];
           pre_stress[3] = integ_stress_pre_[3,index_i];
@@ -1201,7 +1206,8 @@ function cal_stress_hexa(Barray, BVarray, detJarray, Dmat, e_position,   #-> hug
           pre_stress[5] = integ_stress_pre_[5,index_i];
           pre_stress[6] = integ_stress_pre_[6,index_i]; 
 
-          final_stress .= pre_stress .+ d_o_vec
+            #final_stress .= pre_stress .+ d_o_vec
+          final_stress = pre_stress .+ d_o_vec
 
           #println("d_e_vec:", d_e_vec)
           #println("d_o_vec:", d_o_vec)
@@ -1209,15 +1215,17 @@ function cal_stress_hexa(Barray, BVarray, detJarray, Dmat, e_position,   #-> hug
           #println("pre_stress':", pre_stress')
 
           if length( plastic_property_ ) > 0 
-               tri_stress .= pre_stress .+ d_o_vec;  # .= .+  -> huge reduce of alloc and memory
+                #tri_stress .= pre_stress .+ d_o_vec;  # .= .+  -> huge reduce of alloc and memory
+               tri_stress = pre_stress .+ d_o_vec;
                mean_stress = ( tri_stress[1]+tri_stress[2]+tri_stress[3] ) / 3.0;
-               # @SVector # -> even
-               #=tri_dev_stress = [tri_stress[1] - mean_stress
-                                 tri_stress[2] - mean_stress
-                                 tri_stress[3] - mean_stress
-                                 tri_stress[4]
-                                 tri_stress[5]
-                                 tri_stress[6]];=#
+                # @SVector # -> even
+                #=tri_dev_stress = [tri_stress[1] - mean_stress
+                                    tri_stress[2] - mean_stress
+                                    tri_stress[3] - mean_stress
+                                    tri_stress[4]
+                                    tri_stress[5]
+                                    tri_stress[6]];=#
+               tri_dev_stress = @MVector zeros(6)
                tri_dev_stress[1] = tri_stress[1] - mean_stress; # even
                tri_dev_stress[2] = tri_stress[2] - mean_stress;
                tri_dev_stress[3] = tri_stress[3] - mean_stress;
@@ -1225,6 +1233,7 @@ function cal_stress_hexa(Barray, BVarray, detJarray, Dmat, e_position,   #-> hug
                tri_dev_stress[5] = tri_stress[5];
                tri_dev_stress[6] = tri_stress[6];
 
+               mean_stress_vec = @MVector zeros(6)
                mean_stress_vec[1] = mean_stress
                mean_stress_vec[2] = mean_stress
                mean_stress_vec[3] = mean_stress
@@ -1243,17 +1252,18 @@ function cal_stress_hexa(Barray, BVarray, detJarray, Dmat, e_position,   #-> hug
                             p_index = j-1;
                        end
                    end
-                   #%p_index
-                   #H = (plastic_property_[p_index+1,1] - plastic_property_[p_index,1]) / (plastic_property_[p_index+1,2] - plastic_property_[p_index,2]);
+                    #%p_index
+                    #H = (plastic_property_[p_index+1,1] - plastic_property_[p_index,1]) / (plastic_property_[p_index+1,2] - plastic_property_[p_index,2]);
                    H = Hd[p_index]
                    d_ep = ( tri_mises_stress - y ) / (3*G + H);
                    
-                   #d_integ_eq_plastic_strain_[ index_i ] = d_ep;
-                   #d_integ_yield_stress_[ index_i ] = H * d_ep;
+                    #d_integ_eq_plastic_strain_[ index_i ] = d_ep;
+                    #d_integ_yield_stress_[ index_i ] = H * d_ep;
                    
-                   final_dev_stress .= tri_dev_stress * (y+H*d_ep) / tri_mises_stress;
-                   #final_stress = final_dev_stress + @SVector [mean_stress, mean_stress, mean_stress, 0, 0, 0];
-                   #final_stress .= final_dev_stress .+ [mean_stress, mean_stress, mean_stress, 0, 0, 0];
+                    #final_dev_stress .= tri_dev_stress * (y+H*d_ep) / tri_mises_stress;
+                   final_dev_stress = tri_dev_stress * (y+H*d_ep) / tri_mises_stress;
+                    #final_stress = final_dev_stress + @SVector [mean_stress, mean_stress, mean_stress, 0, 0, 0];
+                    #final_stress .= final_dev_stress .+ [mean_stress, mean_stress, mean_stress, 0, 0, 0];
                    final_stress .= final_dev_stress .+ mean_stress_vec;
                    
                    #d_o_vec .= final_stress .- pre_stress; # .= .-  -> even
@@ -1262,11 +1272,11 @@ function cal_stress_hexa(Barray, BVarray, detJarray, Dmat, e_position,   #-> hug
                    integ_yield_stress_[ index_i ] += H * d_ep;
                #else
                    #final_stress .= pre_stress .+ d_o_vec
-               end
+               end # if
 
           #else
                 #final_stress .= pre_stress .+ d_o_vec
-          end
+          end #if
 
                 #d_integ_stress_[index_i,:] = d_o_vec'
                 #d_integ_strain_[index_i,:] = d_e_vec'
@@ -1306,31 +1316,41 @@ function cal_stress_hexa(Barray, BVarray, detJarray, Dmat, e_position,   #-> hug
 
                 #q_vec_i = B' * o_vec;
                 #q_vec_i = Bfinal' * o_vec; # .= -> huge increase alloc and memory
-          q_vec_i .= Bfinal' * final_stress # .=   -> huge reduce of alloc and memory
+            #q_vec_i .= Bfinal' * final_stress # .=   -> huge reduce of alloc and memory
+          q_vec_i = Bfinal' * final_stress
 
                 #q_vec = q_vec + W[i]*W[i]*W[i] * detJarray[i] * q_vec_i;
                 #q_vec .+=  W[i]*W[i]*W[i] * detJarray[i] * q_vec_i; # .= .+  -> huge reduce of alloc and memory  #->0.8M alloc
           @inbounds for j = 1 : 24   # -> 1 alloc -> 0 alloc
-                q_vec[j] += W * W * W * detJarray[i] * q_vec_i[j]
-                        #q_vec[j] += W[i]*W[i]*W[i] * detJarray[i] * q_vec_i[j] # -> 1 alloc
-                        #q_vec[j] += detJarray[i] * q_vec_i[j]  # -> 0 alloc
+                Qe[j, e] += W * W * W * detJ * q_vec_i[j]
+                #q_vec[j] += W * W * W * detJ * q_vec_i[j]
+                    #q_vec[j] += W * W * W * detJarray[i] * q_vec_i[j]
+                            #q_vec[j] += W[i]*W[i]*W[i] * detJarray[i] * q_vec_i[j] # -> 1 alloc
+                            #q_vec[j] += detJarray[i] * q_vec_i[j]  # -> 0 alloc
           end
 
 
         end # for i = 1 : integ_num
 
         
-        for i = 1 : 8
-            #Q[ 1 + (elementmat[e,i]-1)*3 ] += q_vec[1 + (i-1)*3 ];
-            #Q[ 2 + (elementmat[e,i]-1)*3 ] += q_vec[2 + (i-1)*3 ];
-            #Q[ 3 + (elementmat[e,i]-1)*3 ] += q_vec[3 + (i-1)*3 ];
+#=      for i = 1 : 8
             Q[ 1 + (elementmat[i,e]-1)*3 ] += q_vec[1 + (i-1)*3 ];
             Q[ 2 + (elementmat[i,e]-1)*3 ] += q_vec[2 + (i-1)*3 ];
             Q[ 3 + (elementmat[i,e]-1)*3 ] += q_vec[3 + (i-1)*3 ];
-        end
-        
+        end 
+=#      
        
     end
+
+
+#=    @inbounds for e = 1 : nElement
+        @inbounds for i = 1 : 8
+            Q[ 1 + (elementmat[i,e]-1)*3 ] += q_mat[1 + (i-1)*3, e];
+            Q[ 2 + (elementmat[i,e]-1)*3 ] += q_mat[2 + (i-1)*3, e];
+            Q[ 3 + (elementmat[i,e]-1)*3 ] += q_mat[3 + (i-1)*3, e];
+        end
+    end=#
+
             #integ_strain_ += d_integ_strain_  # -> same
 
             #return d_integ_stress_, d_integ_strain_, d_integ_yield_stress_, d_integ_plastic_strain_, d_integ_eq_plastic_strain_, Q
@@ -1378,7 +1398,14 @@ end
 end
 =#
 
-function cal_B_BVbar_hexa(Pusai1, e_position, B, BV_i, BVbar_i)
+
+#function cal_Bfinal(Bfinal::MMatrix{6,24,Float64,144},
+#                    Parray_i::MMatrix{3,8,Float64,24}, 
+#                    BVbar::MMatrix{6,24,Float64,144})
+function cal_Bfinal(Bfinal::MMatrix{6,24,Float64,144},
+                    BVbar::MMatrix{6,24,Float64,144},
+                    Pusai1::MMatrix{3,8,Float64,24}, 
+                    e_position::MMatrix{3,8,Float64,24})
 
     J11 = J12 = J13 = 0.0
     J21 = J22 = J23 = 0.0
@@ -1417,10 +1444,184 @@ function cal_B_BVbar_hexa(Pusai1, e_position, B, BV_i, BVbar_i)
     iJ23 = ( J13*J21 - J11*J23 ) * div_v  # / v;
     iJ33 = ( J11*J22 - J12*J21 ) * div_v  # / v;
 
-    #P2 = zeros(3,8)
-    #P2 .= 0.0
-    B .= 0
-    #div3::Float64 = 1.0/3.0
+
+    @inbounds for i = 1 : 8
+
+        #P2[1,i] = iJ11 * Pusai1[1,i] + iJ12 * Pusai1[2,i] + iJ13 * Pusai1[3,i] 
+        #P2[2,i] = iJ21 * Pusai1[1,i] + iJ22 * Pusai1[2,i] + iJ23 * Pusai1[3,i] 
+        #P2[3,i] = iJ31 * Pusai1[1,i] + iJ32 * Pusai1[2,i] + iJ33 * Pusai1[3,i] 
+
+        Pix = iJ11 * Pusai1[1,i] + iJ12 * Pusai1[2,i] + iJ13 * Pusai1[3,i] 
+        Piy = iJ21 * Pusai1[1,i] + iJ22 * Pusai1[2,i] + iJ23 * Pusai1[3,i] 
+        Piz = iJ31 * Pusai1[1,i] + iJ32 * Pusai1[2,i] + iJ33 * Pusai1[3,i] 
+
+        #Pix = Parray_i[1,i]
+        #Piy = Parray_i[2,i] 
+        #Piz = Parray_i[3,i]
+
+        Bfinal[1,(i-1)*3+1] += Pix
+        Bfinal[2,(i-1)*3+2] += Piy
+        Bfinal[3,(i-1)*3+3] += Piz
+        Bfinal[4,(i-1)*3+1] += Piy
+        Bfinal[4,(i-1)*3+2] += Pix
+        Bfinal[5,(i-1)*3+2] += Piz
+        Bfinal[5,(i-1)*3+3] += Piy
+        Bfinal[6,(i-1)*3+1] += Piz
+        Bfinal[6,(i-1)*3+3] += Pix
+
+        Bfinal[1,i*3-2] += -Pix  / 3.0  +  BVbar[1,i*3-2]
+        Bfinal[1,i*3-1] += -Piy  / 3.0  +  BVbar[1,i*3-1]
+        Bfinal[1,i*3]   += -Piz  / 3.0  +  BVbar[1,i*3]
+        Bfinal[2,i*3-2] += -Pix  / 3.0  +  BVbar[2,i*3-2]
+        Bfinal[2,i*3-1] += -Piy  / 3.0  +  BVbar[2,i*3-1]
+        Bfinal[2,i*3]   += -Piz  / 3.0  +  BVbar[2,i*3]
+        Bfinal[3,i*3-2] += -Pix  / 3.0  +  BVbar[3,i*3-2]
+        Bfinal[3,i*3-1] += -Piy  / 3.0  +  BVbar[3,i*3-1]
+        Bfinal[3,i*3]   += -Piz  / 3.0  +  BVbar[3,i*3]
+
+#=      Bfinal[1,i*3-2] -= Pix  / 3.0
+        Bfinal[1,i*3-1] -= Piy  / 3.0
+        Bfinal[1,i*3]   -= Piz  / 3.0
+        Bfinal[2,i*3-2] -= Pix  / 3.0
+        Bfinal[2,i*3-1] -= Piy  / 3.0
+        Bfinal[2,i*3]   -= Piz  / 3.0
+        Bfinal[3,i*3-2] -= Pix  / 3.0
+        Bfinal[3,i*3-1] -= Piy  / 3.0
+        Bfinal[3,i*3]   -= Piz  / 3.0
+
+        Bfinal[1,i*3-2] += BVbar[1,i*3-2]
+        Bfinal[1,i*3-1] += BVbar[1,i*3-1]
+        Bfinal[1,i*3]   += BVbar[1,i*3]
+        Bfinal[2,i*3-2] += BVbar[2,i*3-2]
+        Bfinal[2,i*3-1] += BVbar[2,i*3-1]
+        Bfinal[2,i*3]   += BVbar[2,i*3]
+        Bfinal[3,i*3-2] += BVbar[3,i*3-2]
+        Bfinal[3,i*3-1] += BVbar[3,i*3-1]
+        Bfinal[3,i*3]   += BVbar[3,i*3]
+        =#
+
+    end
+
+    #Bfinal .+= BVbar
+
+    return detJi
+
+end
+
+#=
+function cal_P_hexa(Pusai1, e_position, 
+                    Parray_i::MMatrix{3,8,Float64,24} ) 
+
+    J11 = J12 = J13 = 0.0
+    J21 = J22 = J23 = 0.0
+    J31 = J32 = J33 = 0.0
+
+    @inbounds for i = 1 : 8
+        J11 += Pusai1[1,i] * e_position[1,i]
+        J12 += Pusai1[1,i] * e_position[2,i]
+        J13 += Pusai1[1,i] * e_position[3,i]
+        J21 += Pusai1[2,i] * e_position[1,i]
+        J22 += Pusai1[2,i] * e_position[2,i]
+        J23 += Pusai1[2,i] * e_position[3,i]
+        J31 += Pusai1[3,i] * e_position[1,i]
+        J32 += Pusai1[3,i] * e_position[2,i]
+        J33 += Pusai1[3,i] * e_position[3,i]
+    end
+
+    v = ( J11*J22*J33 
+        + J12*J23*J31 
+        + J13*J21*J32 
+        - J11*J23*J32 
+        - J12*J21*J33 
+        - J13*J22*J31 )
+    detJi = v
+    div_v::Float64 = 1.0/v
+
+    iJ11 = ( J22*J33 - J23*J32 ) * div_v  # / v;
+    iJ21 = ( J23*J31 - J21*J33 ) * div_v  # / v;
+    iJ31 = ( J21*J32 - J22*J31 ) * div_v  # / v;
+
+    iJ12 = ( J13*J32 - J12*J33 ) * div_v  # / v;
+    iJ22 = ( J11*J33 - J13*J31 ) * div_v  # / v;
+    iJ32 = ( J12*J31 - J11*J32 ) * div_v  # / v;
+
+    iJ13 = ( J12*J23 - J13*J22 ) * div_v  # / v;
+    iJ23 = ( J13*J21 - J11*J23 ) * div_v  # / v;
+    iJ33 = ( J11*J22 - J12*J21 ) * div_v  # / v;
+
+    
+    @inbounds for i = 1 : 8
+        #P2[1,i] = iJ11 * Pusai1[1,i] + iJ12 * Pusai1[2,i] + iJ13 * Pusai1[3,i] 
+        #P2[2,i] = iJ21 * Pusai1[1,i] + iJ22 * Pusai1[2,i] + iJ23 * Pusai1[3,i] 
+        #P2[3,i] = iJ31 * Pusai1[1,i] + iJ32 * Pusai1[2,i] + iJ33 * Pusai1[3,i] 
+
+        Pix = iJ11 * Pusai1[1,i] + iJ12 * Pusai1[2,i] + iJ13 * Pusai1[3,i] 
+        Piy = iJ21 * Pusai1[1,i] + iJ22 * Pusai1[2,i] + iJ23 * Pusai1[3,i] 
+        Piz = iJ31 * Pusai1[1,i] + iJ32 * Pusai1[2,i] + iJ33 * Pusai1[3,i] 
+
+        Parray_i[1,i] = Pix
+        Parray_i[2,i] = Piy
+        Parray_i[3,i] = Piz
+    end
+
+    return detJi
+
+end
+=#
+
+
+#function cal_B_BVbar_hexa(Pusai1, e_position, B, BV_i, BVbar_i)
+#function cal_B_BVbar_hexa(Pusai1, e_position, B::MMatrix{6,24,Float64,144}, 
+#                                              BV_i::MMatrix{6,24,Float64,144}, 
+#                                              BVbar::MMatrix{6,24,Float64,144}) # ::MMatrix{6,24,Float64,144} -> fast
+#=
+function cal_B_BVbar_hexa(Pusai1, e_position, 
+                            B::MMatrix{6,24,Float64,144}, 
+                            BV_i::MMatrix{6,24,Float64,144},
+                            Parray_i::MMatrix{3,8,Float64,24} ) 
+    
+    J11 = J12 = J13 = 0.0
+    J21 = J22 = J23 = 0.0
+    J31 = J32 = J33 = 0.0
+
+    @inbounds for i = 1 : 8
+        J11 += Pusai1[1,i] * e_position[1,i]
+        J12 += Pusai1[1,i] * e_position[2,i]
+        J13 += Pusai1[1,i] * e_position[3,i]
+        J21 += Pusai1[2,i] * e_position[1,i]
+        J22 += Pusai1[2,i] * e_position[2,i]
+        J23 += Pusai1[2,i] * e_position[3,i]
+        J31 += Pusai1[3,i] * e_position[1,i]
+        J32 += Pusai1[3,i] * e_position[2,i]
+        J33 += Pusai1[3,i] * e_position[3,i]
+    end
+
+    v = ( J11*J22*J33 
+        + J12*J23*J31 
+        + J13*J21*J32 
+        - J11*J23*J32 
+        - J12*J21*J33 
+        - J13*J22*J31 )
+    detJi = v
+    div_v::Float64 = 1.0/v
+
+    iJ11 = ( J22*J33 - J23*J32 ) * div_v  # / v;
+    iJ21 = ( J23*J31 - J21*J33 ) * div_v  # / v;
+    iJ31 = ( J21*J32 - J22*J31 ) * div_v  # / v;
+
+    iJ12 = ( J13*J32 - J12*J33 ) * div_v  # / v;
+    iJ22 = ( J11*J33 - J13*J31 ) * div_v  # / v;
+    iJ32 = ( J12*J31 - J11*J32 ) * div_v  # / v;
+
+    iJ13 = ( J12*J23 - J13*J22 ) * div_v  # / v;
+    iJ23 = ( J13*J21 - J11*J23 ) * div_v  # / v;
+    iJ33 = ( J11*J22 - J12*J21 ) * div_v  # / v;
+
+        #P2 = zeros(3,8)
+        #P2 .= 0.0
+    #B .= 0
+    #B = @MMatrix zeros(6,24)
+        #div3::Float64 = 1.0/3.0
 
     @inbounds for i = 1 : 8
         #P2[1,i] = iJ11 * Pusai1[1,i] + iJ12 * Pusai1[2,i] + iJ13 * Pusai1[3,i] 
@@ -1430,6 +1631,11 @@ function cal_B_BVbar_hexa(Pusai1, e_position, B, BV_i, BVbar_i)
         Pix = iJ11 * Pusai1[1,i] + iJ12 * Pusai1[2,i] + iJ13 * Pusai1[3,i] 
         Piy = iJ21 * Pusai1[1,i] + iJ22 * Pusai1[2,i] + iJ23 * Pusai1[3,i] 
         Piz = iJ31 * Pusai1[1,i] + iJ32 * Pusai1[2,i] + iJ33 * Pusai1[3,i] 
+
+        Parray_i[1,i] = Pix
+        Parray_i[2,i] = Piy
+        Parray_i[3,i] = Piz
+
         B[1,(i-1)*3+1] = Pix
         B[2,(i-1)*3+2] = Piy
         B[3,(i-1)*3+3] = Piz
@@ -1449,6 +1655,7 @@ function cal_B_BVbar_hexa(Pusai1, e_position, B, BV_i, BVbar_i)
         BV_i[3,i*3-2] = Pix  / 3.0
         BV_i[3,i*3-1] = Piy  / 3.0
         BV_i[3,i*3]   = Piz  / 3.0
+
     end
 
     #=B .= 0
@@ -1471,14 +1678,96 @@ function cal_B_BVbar_hexa(Pusai1, e_position, B, BV_i, BVbar_i)
         # BV_i[4,i] = BV_i[5,i] = BV_i[6,i] = 0.0
     end =#
 
-    @inbounds for i = 1:24
-        BVbar_i[1,i] = BV_i[1,i] * detJi
-        BVbar_i[2,i] = BV_i[2,i] * detJi
-        BVbar_i[3,i] = BV_i[3,i] * detJi
-    end
+#=  @inbounds for i = 1:24
+        #BVbar_i[1,i] = BV_i[1,i] * detJi
+        #BVbar_i[2,i] = BV_i[2,i] * detJi
+        #BVbar_i[3,i] = BV_i[3,i] * detJi
+        BVbar[1,i] += BV_i[1,i] * detJi
+        BVbar[2,i] += BV_i[2,i] * detJi
+        BVbar[3,i] += BV_i[3,i] * detJi
+    end  =#
 
     return detJi
+    #return detJi, B
 end
+=#
+
+function cal_BVbar_hexa(Pusai_mat, 
+                        e_position::MMatrix{3,8,Float64,24}, 
+                        BVbar::MMatrix{6,24,Float64,144}) # ::MMatrix{6,24,Float64,144} -> fast
+
+    V = 0.0
+    @inbounds for k = 1 : 8 #integ_num
+
+        J11 = J12 = J13 = 0.0
+        J21 = J22 = J23 = 0.0
+        J31 = J32 = J33 = 0.0
+        Pusai1 = Pusai_mat[k]
+
+        @inbounds for i = 1 : 8
+            J11 += Pusai1[1,i] * e_position[1,i]
+            J12 += Pusai1[1,i] * e_position[2,i]
+            J13 += Pusai1[1,i] * e_position[3,i]
+            J21 += Pusai1[2,i] * e_position[1,i]
+            J22 += Pusai1[2,i] * e_position[2,i]
+            J23 += Pusai1[2,i] * e_position[3,i]
+            J31 += Pusai1[3,i] * e_position[1,i]
+            J32 += Pusai1[3,i] * e_position[2,i]
+            J33 += Pusai1[3,i] * e_position[3,i]
+        end
+
+        v = ( J11*J22*J33 
+        + J12*J23*J31 
+        + J13*J21*J32 
+        - J11*J23*J32 
+        - J12*J21*J33 
+        - J13*J22*J31 )
+        detJi = v
+        div_v::Float64 = 1.0/v
+        V += detJi
+
+        iJ11 = ( J22*J33 - J23*J32 ) * div_v  # / v;
+        iJ21 = ( J23*J31 - J21*J33 ) * div_v  # / v;
+        iJ31 = ( J21*J32 - J22*J31 ) * div_v  # / v;
+
+        iJ12 = ( J13*J32 - J12*J33 ) * div_v  # / v;
+        iJ22 = ( J11*J33 - J13*J31 ) * div_v  # / v;
+        iJ32 = ( J12*J31 - J11*J32 ) * div_v  # / v;
+
+        iJ13 = ( J12*J23 - J13*J22 ) * div_v  # / v;
+        iJ23 = ( J13*J21 - J11*J23 ) * div_v  # / v;
+        iJ33 = ( J11*J22 - J12*J21 ) * div_v  # / v;
+
+        
+        @inbounds for i = 1 : 8
+            #P2[1,i] = iJ11 * Pusai1[1,i] + iJ12 * Pusai1[2,i] + iJ13 * Pusai1[3,i] 
+            #P2[2,i] = iJ21 * Pusai1[1,i] + iJ22 * Pusai1[2,i] + iJ23 * Pusai1[3,i] 
+            #P2[3,i] = iJ31 * Pusai1[1,i] + iJ32 * Pusai1[2,i] + iJ33 * Pusai1[3,i] 
+
+            Pix = iJ11 * Pusai1[1,i] + iJ12 * Pusai1[2,i] + iJ13 * Pusai1[3,i] 
+            Piy = iJ21 * Pusai1[1,i] + iJ22 * Pusai1[2,i] + iJ23 * Pusai1[3,i] 
+            Piz = iJ31 * Pusai1[1,i] + iJ32 * Pusai1[2,i] + iJ33 * Pusai1[3,i] 
+            
+            BVbar[1,i*3-2] += Pix  / 3.0 * detJi
+            BVbar[1,i*3-1] += Piy  / 3.0 * detJi
+            BVbar[1,i*3]   += Piz  / 3.0 * detJi
+            BVbar[2,i*3-2] += Pix  / 3.0 * detJi
+            BVbar[2,i*3-1] += Piy  / 3.0 * detJi
+            BVbar[2,i*3]   += Piz  / 3.0 * detJi
+            BVbar[3,i*3-2] += Pix  / 3.0 * detJi
+            BVbar[3,i*3-1] += Piy  / 3.0 * detJi
+            BVbar[3,i*3]   += Piz  / 3.0 * detJi
+
+        end
+
+    end
+
+    BVbar .= BVbar / V
+
+    return 
+
+end
+
 
 #=
 function cal_BVbar(P2, detJ_i, BV_i, BVbar_i)
@@ -1591,7 +1880,7 @@ end
 function cal_Pusai_hexa(integ_num)
 
     #Pusai_mat = zeros(3,8,integ_num); #@MArray -> huge increase alloc and memory
-    Pusai_mat = [ zeros(3,8) for i=1:8]  # -> huge reduce alloc and memory compared to  zeros(3,8,integ_num)
+    Pusai_mat = [ @MMatrix zeros(3,8) for i=1:8]  # -> huge reduce alloc and memory compared to  zeros(3,8,integ_num)
     
     delta_mat = [ -1.0  -1.0  -1.0
                    1.0  -1.0  -1.0
@@ -1967,6 +2256,9 @@ function cal_contact_force(c_force3::Array{Float64,1}, CT, instance_pair, cp_ind
 
     d_lim::Float64 = elementMinSize * 0.3;
     myu = 0.25
+    kc = 1.0;
+    kc_s = 1.0; # self-contact
+
     div3::Float64 = 1.0/3.0
 
         #velo3 = reshape(velo, 3, nNode)
@@ -2504,7 +2796,7 @@ function cal_contact_force(c_force3::Array{Float64,1}, CT, instance_pair, cp_ind
                         end
                             #println("ve:", ve[1],",",ve[2],",",ve[3]," cv=", cv)
                             
-                        k = young * S / Lmax; # * 10.0  # * 10.0  # -> for hard contact
+                        k = young * S / Lmax * kc_s # * 10.0  # * 10.0  # -> for hard contact
                                 # cc = 2 * sqrt( diag_M(i) * k ) * 0;
                                 #f = k * x[3] * n; #  - cc * (v*n.') * n;
                         F = k * d
@@ -2921,7 +3213,7 @@ function cal_contact_force(c_force3::Array{Float64,1}, CT, instance_pair, cp_ind
                 #if 0.0 <= x[1] && 0.0 <= x[2] && x[1] + x[2] <= 1.0 &&   # -> 10 alloc -> 0 alloc
                 #    d > 0 && d <= d_lim
                 if 0.0 <= x1 && 0.0 <= x2 && x1 + x2 <= 1.0 &&   # -> 10 alloc -> 0 alloc
-                    d > 0 && d <= d_lim
+                    d > 0.0 && d <= d_lim
 
                     if d - d_node_pre[i] > d_max
                         d = d_node_pre[i] + d_max;
@@ -2971,7 +3263,7 @@ function cal_contact_force(c_force3::Array{Float64,1}, CT, instance_pair, cp_ind
                     end
                         #println("ve:", ve[1],",",ve[2],",",ve[3]," cv=", cv)
                         
-                    k = young * S / Lmax  # * 10.0  # * 2.0 ~ 10.0  # -> for hard contact
+                    k = young * S / Lmax  * kc  # * 2.0 ~ 10.0  # -> for hard contact
                                 # cc = 2 * sqrt( diag_M(i) * k ) * 0;
                                 #f = k * x[3] * n; #  - cc * (v*n.') * n;
                     F = k * d
