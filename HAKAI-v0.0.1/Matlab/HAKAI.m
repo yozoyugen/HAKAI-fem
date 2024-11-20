@@ -31,7 +31,7 @@ function res = HAKAI(varargin)
     elementmat = MODEL.elementmat;
     element_material = MODEL.element_material;
     element_instance = MODEL.element_instance;
-    contact_flag = MODEL.contact_flag;
+    contact_flag = MODEL.contact_flag
     
     flag_fracture = 0;
     
@@ -154,7 +154,7 @@ function res = HAKAI(varargin)
     %             'c_triangles_eleid', [],...
     %             'c_nodes', [] );
 
-    if contact_flag == 1
+    if contact_flag >= 1
         tic;
 
         for i = 1 : length(MODEL.INSTANCE)  
@@ -174,6 +174,9 @@ function res = HAKAI(varargin)
                 for i = 1 : ni
                     js = i+1;
                     %js = i;  % -> include self-contact
+                    if contact_flag == 2
+                        js = i;
+                    end
 
                     for j = js : ni
                         MODEL.CP(c).instance_id_i = i;
@@ -292,7 +295,7 @@ function res = HAKAI(varargin)
     element_ctr = cal_element_ctr(coordmat, elementmat);
 
 
-    output_num = 40
+    output_num = 100
     d_out = floor(time_num / output_num)
     output_data(1:output_num) = struct('disp',zeros(fn, 1),...
                                'integ_stress',zeros(6, nElement * integ_num),...  
@@ -325,7 +328,7 @@ function res = HAKAI(varargin)
       external_force = zeros(fn, 1);
       external_force( force_dof ) = force_v;
       
-      if contact_flag == 1
+      if contact_flag >= 1
           %fprintf('contact\n')
           %tic
           [c_force3, d_node] = cal_contact_force(MODEL.CP, position, velo, diag_M, elementMinSize, elementMaxSize, d_max*1, d_node, ...
@@ -1082,6 +1085,8 @@ function res = HAKAI(varargin)
     d_node = zeros(length(velo)/3, 1);
     d_lim = elementMinSize * 0.3;
     myu = 0.25;
+    kc = 1.0;
+    kc_s = 1.0; % self-contact
 
     %'cal_contact_force'
 
@@ -1289,7 +1294,7 @@ function res = HAKAI(varargin)
                                 %cv = abs(ve(1)*n(1)+ve(2)*n(2)+ve(3)*n(3));
                             end
                             %cv
-                            k = young * S / Lmax * 1.0;
+                            k = young * S / Lmax * kc_s; %1.0;
                             %damp = 2 * sqrt( diag_M(i) * k ) * 0.1;
                             F = k * d;
                             f = F * n; %  - damp * dot(v,n) * n;
@@ -1491,29 +1496,29 @@ function res = HAKAI(varargin)
                     v(2) = velo(i*3-1) - velo(j0*3-1);
                     v(3) = velo(i*3) - velo(j0*3);
                     mag_v = my3norm(v);
-                    %cv = 1.0;
+                        %cv = 1.0;
                     ve = zeros(3,1);
                     vs = zeros(3,1);
                     if mag_v > 0.0   % 1.0E-10  % 0          
-                        %ve = v / norm(v);
+                            %ve = v / norm(v);
                         ve = v / mag_v;
-                        %cv = abs( ve(1)*n(1)+ve(2)*n(2)+ve(3)*n(3) ); %dot(ve,n)
+                            %cv = abs( ve(1)*n(1)+ve(2)*n(2)+ve(3)*n(3) ); %dot(ve,n)
                     end
-                    %fprintf("ve:[%.6e,%.6e,%.6e], cv=%.6e\n", ve(1),ve(2),ve(3),cv)  % ve, c -> same as julia
-                    k = young * S / Lmax;
-                    %damp = 2 * sqrt( diag_M(i) * k ) * 0.1;
+                        %fprintf("ve:[%.6e,%.6e,%.6e], cv=%.6e\n", ve(1),ve(2),ve(3),cv)  % ve, c -> same as julia
+                    k = young * S / Lmax * kc;   %10.0;
+                        %damp = 2 * sqrt( diag_M(i) * k ) * 0.1;
                     F = k * d;
                     f = F * n; %  - damp * dot(v,n) * n;
 
-                    %fprintf(bug_report, "time=%.3e, i=%d, cv=%.6e, vi=%.6e, %.6e, %.6e,\n",...
-                    %                     time_, i, cv, v(1), v(2), v(3));
-                    %   -> no diff. from julia
-                    %fprintf(bug_report, "time=%.3e, i=%d, vi=%.16e, %.16e, %.16e\n",...
-                    %                     time_, i, v(1), v(2), v(3));
-                    %   -> diff. from julia.  This might be double rounding
-                    %   error. not coding bugs
-                    %fprintf(bug_report, "time=%.3e, i=%d, pi=%.16e, %.16e, %.16e\n",...
-                    %                     time_, i, p(1), p(2), p(3));
+                        %fprintf(bug_report, "time=%.3e, i=%d, cv=%.6e, vi=%.6e, %.6e, %.6e,\n",...
+                        %                     time_, i, cv, v(1), v(2), v(3));
+                        %   -> no diff. from julia
+                        %fprintf(bug_report, "time=%.3e, i=%d, vi=%.16e, %.16e, %.16e\n",...
+                        %                     time_, i, v(1), v(2), v(3));
+                        %   -> diff. from julia.  This might be double rounding
+                        %   error. not coding bugs
+                        %fprintf(bug_report, "time=%.3e, i=%d, pi=%.16e, %.16e, %.16e\n",...
+                        %                     time_, i, p(1), p(2), p(3));
 
                     %--- Friction
                     %dot_ve_n = ve(1)*n(1)+ve(2)*n(2)+ve(3)*n(3)
@@ -1526,18 +1531,6 @@ function res = HAKAI(varargin)
                     vs(3) = ve(3) - dot_ve_n * n(3);
                     fric = -myu * F * vs;
                     f = f + fric;  
-
-                    %fprintf(bug_report, "time=%.3e, i=%d, n=%.16e, %.16e, %.16e\n",...
-                    %                      time_, i, n(1), n(2), n(3));
-                    %fprintf(bug_report, "time=%.3e, i=%d, ve=%.16e, %.16e, %.16e\n",...
-                    %                      time_, i, ve(1), ve(2), ve(3));
-                    %fprintf(bug_report, "time=%.3e, i=%d, vs=%.16e, %.16e, %.16e\n",...
-                    %                      time_, i, vs(1), vs(2), vs(3));
-
-                    %fprintf(bug_report, "time=%.3e, i=%d, k=%.16e, d=%.16e, S=%.16e\n",...
-                    %                     time_, i, k, d, S);
-                    %fprintf(bug_report, "time=%.3e, i=%d, f=%.16e, %.16e, %.16e\n",...
-                    %                     time_, i, f(1), f(2), f(3));
 
                     
                     c_force3(1,i) = c_force3(1,i) + f(1); 

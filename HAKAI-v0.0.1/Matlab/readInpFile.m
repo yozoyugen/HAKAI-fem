@@ -626,7 +626,7 @@ function [MODEL] = readInpFile(fname)
   mass_scaling = 1;
   for i = 1 : n
     if contains(lines{i}, '*Fixed Mass Scaling') > 0  
-        s = replace(lines{i+1},' ', '');
+        s = replace(lines{i},' ', '');
         ss = split( s,',');
         ss = ss{2};
         v_ = ss( (strfind(ss, 'factor=') + 7):length(ss) );
@@ -830,6 +830,13 @@ function [MODEL] = readInpFile(fname)
   for i = 1 : n
     if contains(lines{i}, '*Contact') > 0   %'*Contact Inclusions'
         contact_flag = 1;
+        break
+    end
+  end
+
+  for i = 1 : n
+    if contains(lines{i}, '*Contact Inclusions') > 0  && contains(lines{i}, 'HAKAIoption=self-contact') > 0
+        contact_flag = 2;
         break
     end
   end
