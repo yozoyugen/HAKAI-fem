@@ -1101,8 +1101,8 @@ function cal_stress_hexa(#Barray, BVarray, #detJarray, #e_position,  #Dmat,   #-
 
     #q_mat = @MMatrix zeros(24, nElement)
     
-    #  
-    @inbounds @floop for e = 1 : nElement  #
+    # @floop  
+    @inbounds for e = 1 : nElement  #
 
         if element_flag[e] == 0
             continue;
