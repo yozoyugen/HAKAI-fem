@@ -3,7 +3,7 @@
 ![HAKAI_icon_20241001_001](https://github.com/user-attachments/assets/6307a870-0d5e-4274-8eec-c5a10ec388ce)
 
 ## Web site  
-[https://caelab.work/](https://caelab.work/){:target="_blank"}  
+[https://caelab.work/](https://caelab.work/)
   
 ## HAKAI is ...  
 Simple finite element method dynamic explicit solver  
