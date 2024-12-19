@@ -763,42 +763,44 @@ function hakai(fname)
         
         end
   
-
-        for i = deleted_element
-
-            instance_id = element_instance[i]
-            ele_id = i - MODEL.INSTANCE[instance_id].element_offset
-            add_c_triangles, add_c_triangles_eleid, add_c_nodes = add_surface_triangle(MODEL.INSTANCE[instance_id], ele_id)
-            #println("add_c_triangles:", add_c_triangles)
-            #println("add_c_triangles_eleid:", add_c_triangles_eleid)
-            #println("add_c_nodes:", add_c_nodes)
-
-            for c = 1 : length(instance_pair)
-
-                #% j -> triangle,   i -> point
-                i_instance = instance_pair[c][1]
-                j_instance = instance_pair[c][2]
-                #println("i_instance:", i_instance, " j_instance:", j_instance)
-                    
-                if i_instance == instance_id  #i_instance
-                    #CT[c].c_nodes_i = c_nodes .+ MODEL.INSTANCE[i].node_offset  
-                    append!(CT[c].c_nodes_i, add_c_nodes .+ MODEL.INSTANCE[instance_id].node_offset )
-                    unique!(CT[c].c_nodes_i)
-                    
-                elseif j_instance == instance_id  
-                    #CT[c].c_nodes_j = c_nodes .+ MODEL.INSTANCE[i].node_offset
-                    #CT[c].c_triangles = c_triangles .+ MODEL.INSTANCE[i].node_offset
-                    #CT[c].c_triangles_eleid = c_triangles_eleid .+ MODEL.INSTANCE[i].element_offset
-
-                    append!(CT[c].c_nodes_j, add_c_nodes .+ MODEL.INSTANCE[instance_id].node_offset )
-                    unique!(CT[c].c_nodes_j)
-                    append!(CT[c].c_triangles_eleid, add_c_triangles_eleid .+ MODEL.INSTANCE[instance_id].element_offset )
-                    CT[c].c_triangles = vcat(CT[c].c_triangles, add_c_triangles .+ MODEL.INSTANCE[instance_id].node_offset)
+        #%--- Update surface ---%
+        if contact_flag > 0
+            for i = deleted_element
+    
+                instance_id = element_instance[i]
+                ele_id = i - MODEL.INSTANCE[instance_id].element_offset
+                add_c_triangles, add_c_triangles_eleid, add_c_nodes = add_surface_triangle(MODEL.INSTANCE[instance_id], ele_id)
+                #println("add_c_triangles:", add_c_triangles)
+                #println("add_c_triangles_eleid:", add_c_triangles_eleid)
+                #println("add_c_nodes:", add_c_nodes)
+    
+                for c = 1 : length(instance_pair)
+    
+                    #% j -> triangle,   i -> point
+                    i_instance = instance_pair[c][1]
+                    j_instance = instance_pair[c][2]
+                    #println("i_instance:", i_instance, " j_instance:", j_instance)
+                        
+                    if i_instance == instance_id  #i_instance
+                        #CT[c].c_nodes_i = c_nodes .+ MODEL.INSTANCE[i].node_offset  
+                        append!(CT[c].c_nodes_i, add_c_nodes .+ MODEL.INSTANCE[instance_id].node_offset )
+                        unique!(CT[c].c_nodes_i)
+                        
+                    elseif j_instance == instance_id  
+                        #CT[c].c_nodes_j = c_nodes .+ MODEL.INSTANCE[i].node_offset
+                        #CT[c].c_triangles = c_triangles .+ MODEL.INSTANCE[i].node_offset
+                        #CT[c].c_triangles_eleid = c_triangles_eleid .+ MODEL.INSTANCE[i].element_offset
+    
+                        append!(CT[c].c_nodes_j, add_c_nodes .+ MODEL.INSTANCE[instance_id].node_offset )
+                        unique!(CT[c].c_nodes_j)
+                        append!(CT[c].c_triangles_eleid, add_c_triangles_eleid .+ MODEL.INSTANCE[instance_id].element_offset )
+                        CT[c].c_triangles = vcat(CT[c].c_triangles, add_c_triangles .+ MODEL.INSTANCE[instance_id].node_offset)
+                    end
+         
+                    #println("CT[", c, "]:", CT[c])  # -> Match with Matlab
                 end
-     
-                #println("CT[", c, "]:", CT[c])  # -> Match with Matlab
+    
             end
-
         end
 
 #=        
