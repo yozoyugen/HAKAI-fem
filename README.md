@@ -46,12 +46,3 @@ julia HAKAI_j.jl ..\input\Tensile5e.inp
 
 <a href="https://youtu.be/7pOkPujlj1I"><img src="https://github.com/user-attachments/assets/0954b6b4-574d-4911-a83a-97b43eabf731" width="500px"></a>
 
-Tensile-test.inp, Tensile-test-glmsh.inp (Dog-bone)  
-[![''](https://github.com/user-attachments/assets/430d8c8f-69ab-41f7-9ad8-02c56e010f8b)](https://youtu.be/zrBSUzXMs58)  
-  
-bullet-impact.inp, bullet-impact-glmsh.inp, 
-[![''](https://github.com/user-attachments/assets/46943222-3946-465b-9b9e-a4c64aeb565b)](https://youtu.be/RczUhYBTxVg)  
-  
-Tensile5e.inp, Tensile5e-glmsh.inp  
-[![''](https://github.com/user-attachments/assets/0954b6b4-574d-4911-a83a-97b43eabf731)](https://youtu.be/7pOkPujlj1I)
-  
