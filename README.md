@@ -2,7 +2,8 @@
 Simple finite element method dynamic explicit solver for elastoplastic and fracture analysis.  
 There are Matlab(.m) and Julia(.jl) versions  
 
-<a href="https://www.youtube.com/watch?v=b7lrxCQCVUU"><img src="https://github.com/user-attachments/assets/b1b8b0d1-12a9-4463-adc6-955fad97c07d" width="540px"></a>  
+<a href="https://www.youtube.com/watch?v=b7lrxCQCVUU"><img src="https://github.com/user-attachments/assets/b1b8b0d1-12a9-4463-adc6-955fad97c07d" width="540px"></a>
+<a href="https://www.youtube.com/watch?v=CabZ8rJxqiU"><img src="https://github.com/user-attachments/assets/6dce3420-cc3c-44d0-bf8b-7c76bc818d1c" width="540px"></a>  
   
 ## Web site  
 [https://caelab.work/](https://caelab.work/)
