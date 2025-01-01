@@ -39,6 +39,7 @@ Command prompt
 julia HAKAI_j.jl ..\input\Tensile5e.inp  
   
 ## Example analysis  
+Click images to show YouTube videos  
 <a href="https://youtu.be/V5tDbxtWsfY"><img src="https://github.com/user-attachments/assets/074c40b4-2ee5-4738-9152-57285dd7324f" width="500px"></a>
 <a href="https://youtu.be/05grq5s9JtM"><img src="https://github.com/user-attachments/assets/34fed318-ca60-479c-9620-71e320c64c21" width="500px"></a>  
 
