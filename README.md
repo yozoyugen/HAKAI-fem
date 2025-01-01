@@ -3,11 +3,7 @@ Simple finite element method dynamic explicit solver for elastoplastic and fract
 There are Matlab(.m) and Julia(.jl) versions  
 
 <a href="https://www.youtube.com/watch?v=b7lrxCQCVUU"><img src="https://github.com/user-attachments/assets/b1b8b0d1-12a9-4463-adc6-955fad97c07d" width="540px"></a>  
-
-![cae_20241204_ss_003](https://github.com/user-attachments/assets/b1b8b0d1-12a9-4463-adc6-955fad97c07d)
-
-![HAKAI_icon_20241001_001](https://github.com/user-attachments/assets/6307a870-0d5e-4274-8eec-c5a10ec388ce)
-
+  
 ## Web site  
 [https://caelab.work/](https://caelab.work/)
   
