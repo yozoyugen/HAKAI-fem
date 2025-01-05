@@ -40,11 +40,11 @@ julia HAKAI_j.jl ..\input\Tensile5e.inp
   
 ## Example analysis  
 Click images to show YouTube videos  
-<a href="https://youtu.be/V5tDbxtWsfY"><img src="https://github.com/user-attachments/assets/074c40b4-2ee5-4738-9152-57285dd7324f" width="500px"></a>
-<a href="https://youtu.be/05grq5s9JtM"><img src="https://github.com/user-attachments/assets/34fed318-ca60-479c-9620-71e320c64c21" width="500px"></a>  
+<a href="https://youtu.be/V5tDbxtWsfY"><img src="https://github.com/user-attachments/assets/074c40b4-2ee5-4738-9152-57285dd7324f" width="400px"></a>
+<a href="https://youtu.be/05grq5s9JtM"><img src="https://github.com/user-attachments/assets/34fed318-ca60-479c-9620-71e320c64c21" width="400px"></a>  
 
-<a href="https://youtu.be/zrBSUzXMs58"><img src="https://github.com/user-attachments/assets/430d8c8f-69ab-41f7-9ad8-02c56e010f8b" width="500px"></a>
-<a href="https://youtu.be/RczUhYBTxVg"><img src="https://github.com/user-attachments/assets/46943222-3946-465b-9b9e-a4c64aeb565b" width="500px"></a>  
+<a href="https://youtu.be/zrBSUzXMs58"><img src="https://github.com/user-attachments/assets/430d8c8f-69ab-41f7-9ad8-02c56e010f8b" width="400px"></a>
+<a href="https://youtu.be/RczUhYBTxVg"><img src="https://github.com/user-attachments/assets/46943222-3946-465b-9b9e-a4c64aeb565b" width="400px"></a>  
 
-<a href="https://youtu.be/7pOkPujlj1I"><img src="https://github.com/user-attachments/assets/0954b6b4-574d-4911-a83a-97b43eabf731" width="500px"></a>
+<a href="https://youtu.be/7pOkPujlj1I"><img src="https://github.com/user-attachments/assets/0954b6b4-574d-4911-a83a-97b43eabf731" width="400px"></a>
 
